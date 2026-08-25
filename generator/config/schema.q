@@ -1,0 +1,20 @@
+trade:([] 
+  ts:`timestamp$();
+  sym:`symbol$();
+  price:`float$();
+  size:`long$();
+  side:`symbol$();
+  venue:`symbol$();
+  seq:`long$()
+  );
+
+quote:([] 
+  ts:`timestamp$();
+  sym:`symbol$();
+  bid:`float$();
+  ask:`float$();
+  bidSize:`long$();
+  askSize:`long$();
+  venue:`symbol$();
+  seq:`long$()
+  );
