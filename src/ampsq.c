@@ -52,6 +52,19 @@ static void remove_client(ampsq_qclient *c) {
     pthread_mutex_unlock(&g_clients_mutex);
 }
 
+/* Confirms `want` is a pointer this process actually created and hasn't
+ * closed yet, before any function dereferences it. Without this, a stale
+ * handle (double .amps.close, or any call after close) or a garbage long
+ * passed in from q crashes the process instead of raising a q error. */
+static ampsq_qclient *find_live_client(ampsq_qclient *want) {
+    ampsq_qclient *p, *found = NULL;
+    pthread_mutex_lock(&g_clients_mutex);
+    for (p = g_clients; p; p = p->next)
+        if (p == want) { found = p; break; }
+    pthread_mutex_unlock(&g_clients_mutex);
+    return found;
+}
+
 static K qerr(const char *s) {
     return krr((S)s);
 }
@@ -61,7 +74,7 @@ static int require_long(K x) {
 }
 
 static int require_symbol_or_char(K x) {
-    return x && (x->t == -KS || x->t == KC || x->t == 10);
+    return x && (x->t == -KS || x->t == KC);
 }
 
 static const char *q_string(K x, char **owned) {
@@ -72,14 +85,6 @@ static const char *q_string(K x, char **owned) {
         return x->s;
 
     if (x->t == KC) {
-        *owned = (char *)malloc((size_t)x->n + 1);
-        if (!*owned) return NULL;
-        memcpy(*owned, kC(x), (size_t)x->n);
-        (*owned)[x->n] = '\0';
-        return *owned;
-    }
-
-    if (x->t == 10) {
         *owned = (char *)malloc((size_t)x->n + 1);
         if (!*owned) return NULL;
         memcpy(*owned, kC(x), (size_t)x->n);
@@ -216,8 +221,8 @@ K ampsq_close(K x) {
     if (!require_long(x))
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
-    if (!c) return (K)0;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return (K)0;  /* already closed, or never a real handle: silent no-op */
 
     remove_client(c);
 
@@ -244,7 +249,9 @@ K ampsq_publish(K x, K y, K z) {
         !z || z->t != 10)
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return qerr("invalid or closed handle");
+
     char *topic_owned = NULL;
     const char *topic = q_string(y, &topic_owned);
 
@@ -268,7 +275,9 @@ K ampsq_subscribe(K x, K y, K z, K w) {
         !require_symbol_or_char(z) || !require_symbol_or_char(w))
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return qerr("invalid or closed handle");
+
     char *topic_owned = NULL, *filter_owned = NULL, *options_owned = NULL;
     const char *topic = q_string(y, &topic_owned);
     const char *filter = q_string(z, &filter_owned);
@@ -298,7 +307,9 @@ K ampsq_sow(K x, K y, K z, K w) {
         !require_symbol_or_char(z) || !require_symbol_or_char(w))
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return qerr("invalid or closed handle");
+
     char *topic_owned = NULL, *filter_owned = NULL, *order_owned = NULL;
     const char *topic = q_string(y, &topic_owned);
     const char *filter = q_string(z, &filter_owned);
@@ -327,7 +338,8 @@ K ampsq_unsubscribe(K x) {
     if (!require_long(x))
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return qerr("invalid or closed handle");
     if (!c->last_subscription)
         return (K)0;
 
@@ -347,7 +359,8 @@ K ampsq_on(K x, K y, K z, K w) {
         !require_symbol_or_char(z) || !require_symbol_or_char(w))
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return qerr("invalid or closed handle");
 
     if (c->callback)
         r0(c->callback);
@@ -378,7 +391,8 @@ K ampsq_status(K x) {
     if (!require_long(x))
         return qerr("type");
 
-    ampsq_qclient *c = (ampsq_qclient *)(intptr_t)x->j;
+    ampsq_qclient *c = find_live_client((ampsq_qclient *)(intptr_t)x->j);
+    if (!c) return qerr("invalid or closed handle");
 
     K keys = ktn(KS, 2);
     kS(keys)[0] = ss("connected");

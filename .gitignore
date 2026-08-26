@@ -2,3 +2,4 @@ build/
 *.o
 *.so
 *.d
+tests/.scratch/

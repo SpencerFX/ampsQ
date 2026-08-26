@@ -1,32 +1,32 @@
 \d .amps
 
-.connect:{[uri;name]
+connect:{[uri;name]
   .amps._connect[uri;name]}
 
-.close:{[h]
+close:{[h]
   .amps._close h}
 
-.publish:{[h;topic;data]
+publish:{[h;topic;data]
   .amps._publish[h;topic;data]}
 
-.subscribe:{[h;topic;filter]
+subscribe:{[h;topic;filter]
   .amps._subscribe[h;topic;filter;""]}
 
-.sow:{[h;topic;filter;orderBy]
+sow:{[h;topic;filter;orderBy]
   .amps._sow[h;topic;filter;orderBy]}
 
-.unsubscribe:{[h]
+unsubscribe:{[h]
   .amps._unsubscribe h}
 
-.on:{[h;callback;topic;filter]
+on:{[h;callback;topic;filter]
   .amps._on[h;callback;topic;filter]}
 
-.status:{[h]
+status:{[h]
   .amps._status h}
 
 / Load the native library from the project build directory.
 / Override AMPSQ_SO if you want a different location.
-if[not `AMPSQ_SO in key `.Q.env;
+if[not `AMPSQ_SO in key `.;
   `AMPSQ_SO set `$"build/libampsq.so"];
 
 .amps._connect:`$AMPSQ_SO 2:(`ampsq_connect;2)

@@ -8,6 +8,6 @@ callback:{[m]
   };
 
  / SOW query with a filter and order-by expression.
-sub:.amps.sow[h;`trades;"/sym = `AAPL";"/timestamp asc"];
+sub:.amps.sow[h;`trades;"/sym = 'AAPL'";"/timestamp asc"];
 
 -1 "SOW subscription: ",string sub;
