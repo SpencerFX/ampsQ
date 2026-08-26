@@ -93,6 +93,41 @@ The callback receives a dictionary:
 
 `data` is a q char vector, not a symbol, so large JSON payloads do not get interned.
 
+## Testing
+
+The C/C++ backend (`src/`, `generator/`) needs a Linux host, a built
+`libampsq.so`, and a real AMPS server, so it isn't covered by an automated
+suite here. What *is* covered automatically, using the
+[q-test](../q-test) framework (a sibling repo, pure q, no shell
+dependency):
+
+- `tests/generator_schema_test.q` - `generator/config/schema.q` loads and
+  produces `trade`/`quote` with the documented columns and kdb+ types.
+- `tests/amps_api_test.q` - the pure-q wrapper layer in `q/amps.q`. Since
+  loading `q/amps.q` directly requires `build/libampsq.so` (which needs
+  the AMPS SDK), this file regenerates just the wrapper-defining prefix
+  of the real source into a scratch file, mocks the native `.amps._*`
+  entry points, and checks the wrappers forward their arguments
+  correctly. Its "regression guards" suite also pins down two real
+  defects this test suite caught and that are now fixed: the wrapper
+  names used to be dotted (`.connect:{...}`, etc) under `\d .amps`,
+  which in q is an absolute reference to root and ignores the current
+  `\d` context - so every wrapper actually landed at root instead of
+  under `.amps`, meaning `.amps.connect[...]` and friends, exactly as
+  written in every example below and in `examples/*.q`, would have
+  raised "undefined variable" even against a correctly built
+  `libampsq.so`. And the `AMPSQ_SO` override guard used to check
+  `` `AMPSQ_SO in key `.Q.env `` - `.Q.env` isn't a real q namespace, so
+  `key` on it was always empty and the guard always overwrote
+  `AMPSQ_SO` with the hardcoded default, even when a caller pre-set it;
+  it now checks `` key `. `` instead.
+
+Run everything from this directory:
+
+    q ../q-test/bin/qtest.q tests
+
+Expect `11 total 11 passed 0 failed 0 errored`.
+
 ## Scope
 
 This first implementation intentionally focuses on:
